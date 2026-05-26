@@ -63,6 +63,7 @@ paths:
               phone: "987654321"
               email: maria@bodega.pe
               selected_plan: kit_basico
+              license_type: mensual
               customer_type: quiere_cotizar
               business_category: bodega
               approx_product_quantity: 250
@@ -227,6 +228,7 @@ components:
         - phone
         - email
         - selected_plan
+        - license_type
         - customer_type
       properties:
         customer_name:
@@ -251,6 +253,8 @@ components:
           example: maria@bodega.pe
         selected_plan:
           $ref: "#/components/schemas/Plan"
+        license_type:
+          $ref: "#/components/schemas/LicenseType"
         customer_type:
           $ref: "#/components/schemas/CustomerType"
         business_category:
@@ -301,7 +305,14 @@ components:
         - kit_basico
         - estandar
         - completo
+        - software
       description: Plan elegido
+    LicenseType:
+      type: string
+      enum:
+        - mensual
+        - permanente
+      description: Modalidad de licencia
     CustomerType:
       type: string
       enum:

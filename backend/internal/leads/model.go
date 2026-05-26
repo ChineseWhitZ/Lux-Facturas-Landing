@@ -12,6 +12,14 @@ const (
 	PlanBasic    Plan = "kit_basico"
 	PlanStandard Plan = "estandar"
 	PlanComplete Plan = "completo"
+	PlanSoftware Plan = "software"
+)
+
+type LicenseType string
+
+const (
+	LicenseMonthly   LicenseType = "mensual"
+	LicensePermanent LicenseType = "permanente"
 )
 
 type CustomerType string
@@ -40,6 +48,7 @@ type Lead struct {
 	Phone                 string       `json:"phone"`
 	Email                 string       `json:"email"`
 	SelectedPlan          Plan         `json:"selected_plan"`
+	LicenseType           LicenseType  `json:"license_type"`
 	CustomerType          CustomerType `json:"customer_type"`
 	BusinessCategory      string       `json:"business_category"`
 	ApproxProductQuantity int          `json:"approx_product_quantity"`
@@ -56,6 +65,7 @@ type CreateLeadInput struct {
 	Phone                 string       `json:"phone"`
 	Email                 string       `json:"email"`
 	SelectedPlan          Plan         `json:"selected_plan"`
+	LicenseType           LicenseType  `json:"license_type"`
 	CustomerType          CustomerType `json:"customer_type"`
 	BusinessCategory      string       `json:"business_category"`
 	ApproxProductQuantity int          `json:"approx_product_quantity"`
@@ -83,6 +93,9 @@ func (input CreateLeadInput) Validate() error {
 	if !input.SelectedPlan.Valid() {
 		return errors.New("selected_plan is invalid")
 	}
+	if !input.LicenseType.Valid() {
+		return errors.New("license_type is invalid")
+	}
 	if !input.CustomerType.Valid() {
 		return errors.New("customer_type is invalid")
 	}
@@ -95,7 +108,16 @@ func (input CreateLeadInput) Validate() error {
 
 func (plan Plan) Valid() bool {
 	switch plan {
-	case PlanBasic, PlanStandard, PlanComplete:
+	case PlanBasic, PlanStandard, PlanComplete, PlanSoftware:
+		return true
+	default:
+		return false
+	}
+}
+
+func (licenseType LicenseType) Valid() bool {
+	switch licenseType {
+	case LicenseMonthly, LicensePermanent:
 		return true
 	default:
 		return false

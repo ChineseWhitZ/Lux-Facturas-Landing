@@ -48,6 +48,7 @@ func (repo *Repository) Create(input CreateLeadInput) (Lead, error) {
 		Phone:                 input.Phone,
 		Email:                 input.Email,
 		SelectedPlan:          input.SelectedPlan,
+		LicenseType:           input.LicenseType,
 		CustomerType:          input.CustomerType,
 		BusinessCategory:      input.BusinessCategory,
 		ApproxProductQuantity: input.ApproxProductQuantity,

@@ -9,6 +9,7 @@ import {
   Clock3,
   Cloud,
   ClipboardCheck,
+  CreditCard,
   FileCheck2,
   Fingerprint,
   Laptop,
@@ -21,6 +22,7 @@ import {
   RefreshCcw,
   Send,
   ShieldCheck,
+  Sparkles,
   Store,
   X,
   Zap,
@@ -135,7 +137,7 @@ const plans = [
     name: "Kit Basico",
     value: "kit_basico",
     price: "S/ 3,800 + IGV",
-    monthly: "+ S/ 99/mes",
+    monthly: "Licencia aparte",
     description: "Para empezar con un puesto de venta Apple y facturacion SUNAT.",
     features: ["MacBook Air M1", "iPhone SE", "Epson TM-M30III", "Cajon de dinero", "300 productos cargados", "SUNAT y capacitacion"],
   },
@@ -143,7 +145,7 @@ const plans = [
     name: "Kit Estandar",
     value: "estandar",
     price: "S/ 5,200 + IGV",
-    monthly: "+ S/ 99/mes",
+    monthly: "Licencia aparte",
     description: "Para tiendas que quieren operar desde MacBook y iPad en mostrador.",
     features: ["MacBook Air M1", "iPad 9", "Epson TM-M30III", "Cajon de dinero", "300 productos cargados", "SUNAT y capacitacion"],
     highlighted: true,
@@ -152,7 +154,7 @@ const plans = [
     name: "Kit Completo",
     value: "completo",
     price: "S/ 6,500 + IGV",
-    monthly: "+ S/ 99/mes",
+    monthly: "Licencia aparte",
     description: "Para negocios que suman punto de venta, terminal movil y scanner.",
     features: ["MacBook Air M1", "iPad 9", "iPhone SE", "Epson TM-M30III", "Cajon de dinero", "SUNAT y capacitacion"],
   },
@@ -176,6 +178,23 @@ const customerTypes = [
     title: "Quiero cotizar primero",
     text: "Necesito que revisen mi negocio antes de elegir kit.",
     icon: ClipboardCheck,
+  },
+];
+
+const licenseTypes = [
+  {
+    value: "mensual",
+    title: "Licencia mensual",
+    price: "S/ 150 con IGV",
+    text: "Ideal para iniciar con menor inversion y soporte continuo.",
+    icon: CreditCard,
+  },
+  {
+    value: "permanente",
+    title: "Licencia permanente",
+    price: "S/ 1,500 con IGV",
+    text: "Pago unico de software para negocios que prefieren comprar la licencia.",
+    icon: Sparkles,
   },
 ];
 
@@ -223,6 +242,7 @@ type LeadForm = {
   phone: string;
   email: string;
   selected_plan: string;
+  license_type: string;
   customer_type: string;
   business_category: string;
   approx_product_quantity: string;
@@ -237,6 +257,7 @@ const initialLeadForm: LeadForm = {
   phone: "",
   email: "",
   selected_plan: "estandar",
+  license_type: "mensual",
   customer_type: "necesita_kit_completo",
   business_category: "Minimarket",
   approx_product_quantity: "300",
@@ -253,11 +274,13 @@ function getLeadEndpoint() {
 }
 
 function getWhatsAppLink(form: LeadForm) {
-  const selectedPlan = plans.find((plan) => plan.value === form.selected_plan)?.name ?? "Kit Estandar";
+  const selectedPlan = plans.find((plan) => plan.value === form.selected_plan)?.name ?? "Solo software";
+  const selectedLicense = licenseTypes.find((license) => license.value === form.license_type)?.title ?? "Licencia mensual";
   const selectedType = customerTypes.find((type) => type.value === form.customer_type)?.title ?? "Quiero cotizar";
   const lines = [
     "Hola, quiero cotizar Lux Facturas.",
     `Plan: ${selectedPlan}`,
+    `Licencia: ${selectedLicense}`,
     `Tipo: ${selectedType}`,
     form.customer_name ? `Nombre: ${form.customer_name}` : "",
     form.company_name ? `Empresa: ${form.company_name}` : "",
@@ -339,8 +362,15 @@ function PurchaseOnboarding() {
   const [submitState, setSubmitState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const selectedPlan = plans.find((plan) => plan.value === form.selected_plan) ?? plans[1];
+  const needsHardwareKit = form.customer_type !== "ya_tiene_mac";
+  const selectedPlan = needsHardwareKit
+    ? plans.find((plan) => plan.value === form.selected_plan) ?? plans[1]
+    : {
+        name: "Solo software",
+        description: "Cotizacion de software para Mac compatible.",
+      };
   const selectedType = customerTypes.find((type) => type.value === form.customer_type) ?? customerTypes[0];
+  const selectedLicense = licenseTypes.find((license) => license.value === form.license_type) ?? licenseTypes[0];
   const SelectedTypeIcon = selectedType.icon;
   const whatsappLink = getWhatsAppLink(form);
 
@@ -348,6 +378,8 @@ function PurchaseOnboarding() {
     setForm((current) => ({
       ...current,
       [field]: value,
+      ...(field === "customer_type" && value === "ya_tiene_mac" ? { selected_plan: "software" } : {}),
+      ...(field === "customer_type" && current.selected_plan === "software" && value !== "ya_tiene_mac" ? { selected_plan: "estandar" } : {}),
     }));
   }
 
@@ -358,7 +390,8 @@ function PurchaseOnboarding() {
 
     const payload = {
       ...form,
-      approx_product_quantity: Number.parseInt(form.approx_product_quantity, 10) || 0,
+        approx_product_quantity: Number.parseInt(form.approx_product_quantity, 10) || 0,
+      selected_plan: needsHardwareKit ? form.selected_plan : "software",
     };
 
     try {
@@ -410,7 +443,7 @@ function PurchaseOnboarding() {
                 <p className="text-sm font-semibold text-white/60">Lectura comercial</p>
                 <h3 className="mt-1 text-xl font-semibold">{selectedPlan.name}</h3>
                 <p className="mt-2 leading-7 text-white/70">
-                  {selectedType.title}. {selectedPlan.description}
+                  {selectedType.title}. {needsHardwareKit ? selectedPlan.description : "Cotizacion de software para Mac compatible."} {selectedLicense.title}: {selectedLicense.price}.
                 </p>
               </div>
             </div>
@@ -454,26 +487,66 @@ function PurchaseOnboarding() {
               </div>
             </div>
 
+            {needsHardwareKit ? (
+              <div>
+                <h3 className="text-xl font-semibold">2. Elige el paquete de equipos</h3>
+                <p className="mt-2 text-sm leading-6 text-white/60">
+                  Estos paquetes aparecen solo si necesitas hardware Apple o quieres recibir el punto de venta completo.
+                </p>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  {plans.map((plan) => {
+                    const active = form.selected_plan === plan.value;
+
+                    return (
+                      <button
+                        key={plan.value}
+                        type="button"
+                        className={`pressable focus-ring rounded-lg border p-4 text-left transition ${
+                          active
+                            ? "border-cyan bg-cyan/12 text-white"
+                            : "border-white/12 bg-night/55 text-white/70 hover:border-white/30"
+                        }`}
+                        onClick={() => updateField("selected_plan", plan.value)}
+                      >
+                        <span className="block font-semibold">{plan.name}</span>
+                        <span className="mt-2 block text-2xl font-semibold text-cyan">{plan.price}</span>
+                        <span className="mt-1 block text-sm text-white/55">Hardware, instalacion y capacitacion</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-white/12 bg-night/55 p-4">
+                <h3 className="text-xl font-semibold">2. Instalacion sobre tu Mac</h3>
+                <p className="mt-2 leading-7 text-white/65">
+                  Como ya tienes Mac, no te mostramos kits con MacBook. Revisaremos compatibilidad y cotizaremos la licencia de Lux Facturas para tu equipo.
+                </p>
+              </div>
+            )}
+
             <div>
-              <h3 className="text-xl font-semibold">2. Elige el paquete base</h3>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {plans.map((plan) => {
-                  const active = form.selected_plan === plan.value;
+              <h3 className="text-xl font-semibold">3. Elige modalidad de licencia</h3>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {licenseTypes.map((license) => {
+                  const Icon = license.icon;
+                  const active = form.license_type === license.value;
 
                   return (
                     <button
-                      key={plan.value}
+                      key={license.value}
                       type="button"
                       className={`pressable focus-ring rounded-lg border p-4 text-left transition ${
                         active
                           ? "border-cyan bg-cyan/12 text-white"
                           : "border-white/12 bg-night/55 text-white/70 hover:border-white/30"
                       }`}
-                      onClick={() => updateField("selected_plan", plan.value)}
+                      onClick={() => updateField("license_type", license.value)}
                     >
-                      <span className="block font-semibold">{plan.name}</span>
-                      <span className="mt-2 block text-2xl font-semibold text-cyan">{plan.price}</span>
-                      <span className="mt-1 block text-sm text-white/55">{plan.monthly}</span>
+                      <Icon size={23} className={active ? "text-cyan" : "text-white/45"} />
+                      <span className="mt-4 block font-semibold">{license.title}</span>
+                      <span className="mt-2 block text-2xl font-semibold text-cyan">{license.price}</span>
+                      <span className="mt-2 block text-sm leading-6 text-white/60">{license.text}</span>
                     </button>
                   );
                 })}
@@ -481,7 +554,7 @@ function PurchaseOnboarding() {
             </div>
 
             <div>
-              <h3 className="text-xl font-semibold">3. Datos del negocio</h3>
+              <h3 className="text-xl font-semibold">4. Datos del negocio</h3>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <label className="grid gap-2">
                   <span className="text-sm font-semibold text-white/70">Nombre del cliente</span>
@@ -912,7 +985,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <SectionIntro
             title="Paquetes completos, listos para instalar"
-            text="El precio inicial incluye hardware, instalacion, configuracion SUNAT, carga inicial y capacitacion. La suscripcion mensual mantiene soporte y actualizaciones."
+            text="El precio inicial incluye hardware, instalacion, configuracion SUNAT, carga inicial y capacitacion. La licencia del sistema se elige aparte: mensual o permanente."
           />
 
           <div className="mt-10 grid gap-5 lg:grid-cols-3">
@@ -965,7 +1038,7 @@ export default function Home() {
           </div>
 
           <p className="mx-auto mt-6 max-w-3xl text-center text-sm leading-6 text-slate-500">
-            Los kits pueden ajustarse si ya tienes una Mac compatible o si necesitas carga adicional de productos, migracion, soporte prioritario o una sucursal extra.
+            Licencia mensual: S/ 150 con IGV. Licencia permanente: S/ 1,500 con IGV. Los kits pueden ajustarse si ya tienes una Mac compatible o si necesitas carga adicional de productos, migracion, soporte prioritario o una sucursal extra.
           </p>
         </div>
       </section>

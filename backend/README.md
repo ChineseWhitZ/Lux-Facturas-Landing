@@ -91,6 +91,7 @@ curl -X POST http://localhost:8080/api/v1/leads \
     "phone": "987654321",
     "email": "maria@bodega.pe",
     "selected_plan": "kit_basico",
+    "license_type": "mensual",
     "customer_type": "quiere_cotizar",
     "business_category": "bodega",
     "approx_product_quantity": 250,
@@ -101,7 +102,8 @@ curl -X POST http://localhost:8080/api/v1/leads \
 
 Valores permitidos:
 
-- `selected_plan`: `kit_basico`, `estandar`, `completo`.
+- `selected_plan`: `kit_basico`, `estandar`, `completo`, `software`.
+- `license_type`: `mensual`, `permanente`.
 - `customer_type`: `ya_tiene_mac`, `necesita_kit_completo`, `quiere_cotizar`.
 - `status`: `nuevo`, `contactado`, `cotizado`, `cerrado`, `descartado`.
 

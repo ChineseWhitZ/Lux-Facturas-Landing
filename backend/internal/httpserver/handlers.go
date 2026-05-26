@@ -21,6 +21,7 @@ var openAPISpec []byte
 
 var dashboardTemplate = template.Must(template.New("dashboard").Funcs(template.FuncMap{
 	"planLabel":         planLabel,
+	"licenseLabel":      licenseLabel,
 	"customerTypeLabel": customerTypeLabel,
 	"statusLabel":       statusLabel,
 	"whatsappHref":      whatsappHref,
@@ -49,8 +50,21 @@ func planLabel(plan leads.Plan) string {
 		return "Kit Estandar"
 	case leads.PlanComplete:
 		return "Kit Completo"
+	case leads.PlanSoftware:
+		return "Solo software"
 	default:
 		return string(plan)
+	}
+}
+
+func licenseLabel(licenseType leads.LicenseType) string {
+	switch licenseType {
+	case leads.LicenseMonthly:
+		return "Mensual / S/ 150 con IGV"
+	case leads.LicensePermanent:
+		return "Permanente / S/ 1,500 con IGV"
+	default:
+		return string(licenseType)
 	}
 }
 
@@ -1051,6 +1065,10 @@ const dashboardHTML = `<!doctype html>
               <div class="field">
                 <span>Plan elegido</span>
                 <strong>{{planLabel .SelectedPlan}}</strong>
+              </div>
+              <div class="field">
+                <span>Licencia</span>
+                <strong>{{licenseLabel .LicenseType}}</strong>
               </div>
               <div class="field">
                 <span>Tipo de cliente</span>
