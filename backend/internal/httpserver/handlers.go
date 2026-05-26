@@ -110,12 +110,12 @@ func whatsappHref(phone string) string {
 }
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/dashboard", http.StatusFound)
+	redirectRelative(w, "dashboard", http.StatusFound)
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if s.isAuthenticated(r) {
-		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		redirectRelative(w, "dashboard", http.StatusSeeOther)
 		return
 	}
 
@@ -144,7 +144,7 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		Secure:   r.TLS != nil,
 		MaxAge:   int((12 * time.Hour).Seconds()),
 	})
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+	redirectRelative(w, "dashboard", http.StatusSeeOther)
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -157,7 +157,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 		Secure:   r.TLS != nil,
 		MaxAge:   -1,
 	})
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	redirectRelative(w, "login", http.StatusSeeOther)
 }
 
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +217,7 @@ func (s *Server) updateLeadStatusFromDashboard(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+	redirectRelative(w, "dashboard", http.StatusSeeOther)
 }
 
 func (s *Server) renderLogin(w http.ResponseWriter, message string) {
@@ -234,7 +234,7 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	redirectRelative(w, "login", http.StatusSeeOther)
 	return false
 }
 
@@ -367,6 +367,11 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{
 		"error": message,
 	})
+}
+
+func redirectRelative(w http.ResponseWriter, target string, status int) {
+	w.Header().Set("Location", target)
+	w.WriteHeader(status)
 }
 
 const swaggerHTML = `<!doctype html>
@@ -535,7 +540,7 @@ const loginHTML = `<!doctype html>
         </div>
       </div>
 
-      <form method="post" action="/login">
+      <form method="post" action="login">
         {{if .Message}}<div class="error">{{.Message}}</div>{{end}}
         <label>
           <span>Usuario</span>
@@ -1008,10 +1013,10 @@ const dashboardHTML = `<!doctype html>
           </div>
         </div>
         <nav class="nav" aria-label="Accesos">
-          <a href="/swagger">Swagger</a>
-          <a href="/openapi.yaml">OpenAPI</a>
-          <a href="/api/v1/leads">JSON</a>
-          <form method="post" action="/logout">
+          <a href="swagger">Swagger</a>
+          <a href="openapi.yaml">OpenAPI</a>
+          <a href="api/v1/leads">JSON</a>
+          <form method="post" action="logout">
             <button type="submit">Salir</button>
           </form>
         </nav>
@@ -1101,7 +1106,7 @@ const dashboardHTML = `<!doctype html>
             </div>
 
             <div class="lead-actions">
-              <form method="post" action="/dashboard/leads/{{.ID}}/status">
+              <form method="post" action="dashboard/leads/{{.ID}}/status">
                 <select name="status" aria-label="Estado">
                   <option value="nuevo" {{if eq .Status "nuevo"}}selected{{end}}>Nuevo</option>
                   <option value="contactado" {{if eq .Status "contactado"}}selected{{end}}>Contactado</option>

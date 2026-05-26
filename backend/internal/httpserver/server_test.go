@@ -146,8 +146,8 @@ func TestDashboardRequiresLogin(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusSeeOther, response.Code)
 	}
 
-	if location := response.Header().Get("Location"); location != "/login" {
-		t.Fatalf("expected redirect to /login, got %q", location)
+	if location := response.Header().Get("Location"); location != "login" {
+		t.Fatalf("expected redirect to login, got %q", location)
 	}
 }
 
@@ -163,8 +163,8 @@ func TestLoginLifecycle(t *testing.T) {
 	if response.Code != http.StatusSeeOther {
 		t.Fatalf("expected status %d, got %d", http.StatusSeeOther, response.Code)
 	}
-	if location := response.Header().Get("Location"); location != "/dashboard" {
-		t.Fatalf("expected redirect to /dashboard, got %q", location)
+	if location := response.Header().Get("Location"); location != "dashboard" {
+		t.Fatalf("expected redirect to dashboard, got %q", location)
 	}
 	if cookies := response.Result().Cookies(); len(cookies) == 0 {
 		t.Fatal("expected session cookie")
@@ -182,8 +182,8 @@ func TestHomeRedirectsToDashboard(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusFound, response.Code)
 	}
 
-	if location := response.Header().Get("Location"); location != "/dashboard" {
-		t.Fatalf("expected redirect to /dashboard, got %q", location)
+	if location := response.Header().Get("Location"); location != "dashboard" {
+		t.Fatalf("expected redirect to dashboard, got %q", location)
 	}
 }
 
