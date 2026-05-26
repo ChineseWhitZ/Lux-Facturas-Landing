@@ -20,6 +20,7 @@ Variables disponibles:
 - `PORT`: puerto HTTP. Por defecto `8080`.
 - `DATABASE_URL`: cadena de conexion de PostgreSQL para futuras integraciones.
 - `CORS_ORIGIN`: origen permitido para el frontend. Por defecto `http://localhost:3000`.
+- `LEADS_FILE`: archivo JSON donde se guardan los leads. Por defecto `data/leads.json`.
 
 ## Ejecutar
 
@@ -27,14 +28,61 @@ Variables disponibles:
 go run ./cmd/api
 ```
 
+## Dashboard
+
+El backend tambien sirve una pantalla interna para revisar leads:
+
+```txt
+http://localhost:8080/dashboard
+```
+
+La raiz redirige automaticamente al dashboard:
+
+```txt
+http://localhost:8080
+```
+
 ## Endpoints iniciales
 
 ```txt
+GET /
+GET /dashboard
+POST /dashboard/leads/{id}/status
 GET /health
 GET /api/v1/status
+POST /api/v1/leads
+GET /api/v1/leads
+GET /api/v1/leads/{id}
+PATCH /api/v1/leads/{id}/status
 GET /openapi.yaml
 GET /swagger
 ```
+
+## Crear un lead
+
+```sh
+curl -X POST http://localhost:8080/api/v1/leads \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_name": "Maria Lopez",
+    "company_name": "Bodega San Jose",
+    "document_number": "10456789123",
+    "phone": "987654321",
+    "email": "maria@bodega.pe",
+    "selected_plan": "kit_basico",
+    "customer_type": "quiere_cotizar",
+    "business_category": "bodega",
+    "approx_product_quantity": 250,
+    "city": "Lima",
+    "message": "Quiero informacion para mi tienda"
+  }'
+```
+
+Valores permitidos:
+
+- `selected_plan`: `kit_basico`, `estandar`, `completo`.
+- `customer_type`: `ya_tiene_mac`, `necesita_kit_completo`, `quiere_cotizar`.
+- `status`: `nuevo`, `contactado`, `cotizado`, `cerrado`, `descartado`.
 
 ## Swagger
 

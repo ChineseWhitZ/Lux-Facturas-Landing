@@ -12,6 +12,7 @@ out/
 bin/
 dist/
 tmp/
+backend/data/
 
 *.log
 *.test

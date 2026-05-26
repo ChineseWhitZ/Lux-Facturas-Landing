@@ -8,13 +8,20 @@ import (
 
 	"lux-facturas/backend/internal/config"
 	"lux-facturas/backend/internal/httpserver"
+	"lux-facturas/backend/internal/leads"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	cfg := config.Load()
-	server := httpserver.NewServer(cfg, logger)
+	leadRepository, err := leads.NewRepository(cfg.LeadsFile)
+	if err != nil {
+		logger.Error("could not initialize lead repository", "error", err)
+		os.Exit(1)
+	}
+
+	server := httpserver.NewServer(cfg, logger, leadRepository)
 
 	httpServer := &http.Server{
 		Addr:         ":" + cfg.Port,

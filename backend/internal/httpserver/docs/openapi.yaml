@@ -1,14 +1,16 @@
 openapi: 3.0.3
 info:
   title: Lux Facturas API
-  version: 0.1.0
-  description: API inicial para Lux Facturas, orientada a pymes y mypes del Peru.
+  version: 0.2.0
+  description: API inicial para guardar y revisar leads o compras desde la landing de Lux Facturas.
 servers:
   - url: http://localhost:8080
     description: Desarrollo local
 tags:
   - name: Health
     description: Endpoints de estado del servicio
+  - name: Leads
+    description: Registro y seguimiento de leads o compras
 paths:
   /health:
     get:
@@ -41,7 +43,129 @@ paths:
               example:
                 service: lux-facturas-api
                 status: ready
-                time: "2026-05-24T20:00:59Z"
+                time: "2026-05-26T15:00:00Z"
+  /api/v1/leads:
+    post:
+      tags:
+        - Leads
+      summary: Registra un lead o compra desde la pagina
+      operationId: createLead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLeadRequest"
+            example:
+              customer_name: Maria Lopez
+              company_name: Bodega San Jose
+              document_number: "10456789123"
+              phone: "987654321"
+              email: maria@bodega.pe
+              selected_plan: kit_basico
+              customer_type: quiere_cotizar
+              business_category: bodega
+              approx_product_quantity: 250
+              city: Lima
+              message: Quiero informacion para mi tienda
+      responses:
+        "201":
+          description: Lead registrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+        "400":
+          description: Solicitud invalida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - Leads
+      summary: Lista leads registrados
+      operationId: listLeads
+      responses:
+        "200":
+          description: Lista de leads, ordenada del mas reciente al mas antiguo
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Lead"
+  /api/v1/leads/{id}:
+    get:
+      tags:
+        - Leads
+      summary: Obtiene un lead por ID
+      operationId: getLead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: lead_1780000000000000000
+      responses:
+        "200":
+          description: Lead encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+        "404":
+          description: Lead no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/leads/{id}/status:
+    patch:
+      tags:
+        - Leads
+      summary: Actualiza el estado interno de un lead
+      operationId: updateLeadStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: lead_1780000000000000000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeadStatusRequest"
+            example:
+              status: contactado
+      responses:
+        "200":
+          description: Estado actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+        "400":
+          description: Estado invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Lead no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /openapi.yaml:
     get:
       tags:
@@ -94,4 +218,111 @@ components:
         time:
           type: string
           format: date-time
-          example: "2026-05-24T20:00:59Z"
+          example: "2026-05-26T15:00:00Z"
+    CreateLeadRequest:
+      type: object
+      required:
+        - customer_name
+        - document_number
+        - phone
+        - email
+        - selected_plan
+        - customer_type
+      properties:
+        customer_name:
+          type: string
+          description: Nombre del cliente
+          example: Maria Lopez
+        company_name:
+          type: string
+          description: Empresa o razon social
+          example: Bodega San Jose
+        document_number:
+          type: string
+          description: RUC o DNI
+          example: "10456789123"
+        phone:
+          type: string
+          description: Telefono o WhatsApp
+          example: "987654321"
+        email:
+          type: string
+          format: email
+          example: maria@bodega.pe
+        selected_plan:
+          $ref: "#/components/schemas/Plan"
+        customer_type:
+          $ref: "#/components/schemas/CustomerType"
+        business_category:
+          type: string
+          description: Rubro del negocio
+          example: bodega
+        approx_product_quantity:
+          type: integer
+          minimum: 0
+          description: Cantidad aproximada de productos
+          example: 250
+        city:
+          type: string
+          example: Lima
+        message:
+          type: string
+          description: Mensaje adicional
+          example: Quiero informacion para mi tienda
+    UpdateLeadStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: "#/components/schemas/LeadStatus"
+    Lead:
+      allOf:
+        - $ref: "#/components/schemas/CreateLeadRequest"
+        - type: object
+          required:
+            - id
+            - status
+            - registered_at
+          properties:
+            id:
+              type: string
+              example: lead_1780000000000000000
+            status:
+              $ref: "#/components/schemas/LeadStatus"
+            registered_at:
+              type: string
+              format: date-time
+              description: Fecha de registro
+              example: "2026-05-26T15:00:00Z"
+    Plan:
+      type: string
+      enum:
+        - kit_basico
+        - estandar
+        - completo
+      description: Plan elegido
+    CustomerType:
+      type: string
+      enum:
+        - ya_tiene_mac
+        - necesita_kit_completo
+        - quiere_cotizar
+      description: Tipo de cliente
+    LeadStatus:
+      type: string
+      enum:
+        - nuevo
+        - contactado
+        - cotizado
+        - cerrado
+        - descartado
+      description: Estado interno del lead
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: selected_plan is invalid

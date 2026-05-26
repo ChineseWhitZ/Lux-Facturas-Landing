@@ -8,29 +8,36 @@ import {
   ChevronDown,
   Clock3,
   Cloud,
+  ClipboardCheck,
   FileCheck2,
   Fingerprint,
+  Laptop,
   Layers3,
   Menu,
   MessageCircle,
   MonitorSmartphone,
+  PackageCheck,
   ReceiptText,
   RefreshCcw,
+  Send,
   ShieldCheck,
   Store,
   X,
   Zap,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 
 const navItems = [
   { label: "Producto", href: "#producto" },
   { label: "Diferenciales", href: "#diferenciales" },
   { label: "Operacion", href: "#operacion" },
+  { label: "Diagnostico", href: "#diagnostico" },
   { label: "Kits", href: "#planes" },
   { label: "FAQ", href: "#faq" },
 ];
+
+const companyWhatsApp = "51919732383";
 
 const modules = [
   {
@@ -126,6 +133,7 @@ const steps = [
 const plans = [
   {
     name: "Kit Basico",
+    value: "kit_basico",
     price: "S/ 3,800 + IGV",
     monthly: "+ S/ 99/mes",
     description: "Para empezar con un puesto de venta Apple y facturacion SUNAT.",
@@ -133,6 +141,7 @@ const plans = [
   },
   {
     name: "Kit Estandar",
+    value: "estandar",
     price: "S/ 5,200 + IGV",
     monthly: "+ S/ 99/mes",
     description: "Para tiendas que quieren operar desde MacBook y iPad en mostrador.",
@@ -141,11 +150,42 @@ const plans = [
   },
   {
     name: "Kit Completo",
+    value: "completo",
     price: "S/ 6,500 + IGV",
     monthly: "+ S/ 99/mes",
     description: "Para negocios que suman punto de venta, terminal movil y scanner.",
     features: ["MacBook Air M1", "iPad 9", "iPhone SE", "Epson TM-M30III", "Cajon de dinero", "SUNAT y capacitacion"],
   },
+];
+
+const customerTypes = [
+  {
+    value: "necesita_kit_completo",
+    title: "Necesito el kit completo",
+    text: "No tengo Mac disponible o quiero recibir todo instalado.",
+    icon: PackageCheck,
+  },
+  {
+    value: "ya_tiene_mac",
+    title: "Ya tengo Mac",
+    text: "Quiero evaluar instalacion sobre mi equipo compatible.",
+    icon: Laptop,
+  },
+  {
+    value: "quiere_cotizar",
+    title: "Quiero cotizar primero",
+    text: "Necesito que revisen mi negocio antes de elegir kit.",
+    icon: ClipboardCheck,
+  },
+];
+
+const businessCategories = [
+  "Minimarket",
+  "Botica",
+  "Restaurante",
+  "Tienda retail",
+  "Distribuidora",
+  "Servicios",
 ];
 
 const faqs = [
@@ -175,6 +215,61 @@ const fadeUp = {
   hidden: { opacity: 0, y: 18 },
   visible: { opacity: 1, y: 0 },
 };
+
+type LeadForm = {
+  customer_name: string;
+  company_name: string;
+  document_number: string;
+  phone: string;
+  email: string;
+  selected_plan: string;
+  customer_type: string;
+  business_category: string;
+  approx_product_quantity: string;
+  city: string;
+  message: string;
+};
+
+const initialLeadForm: LeadForm = {
+  customer_name: "",
+  company_name: "",
+  document_number: "",
+  phone: "",
+  email: "",
+  selected_plan: "estandar",
+  customer_type: "necesita_kit_completo",
+  business_category: "Minimarket",
+  approx_product_quantity: "300",
+  city: "",
+  message: "",
+};
+
+function getLeadEndpoint() {
+  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+    return "http://localhost:8080/api/v1/leads";
+  }
+
+  return "/_/backend/api/v1/leads";
+}
+
+function getWhatsAppLink(form: LeadForm) {
+  const selectedPlan = plans.find((plan) => plan.value === form.selected_plan)?.name ?? "Kit Estandar";
+  const selectedType = customerTypes.find((type) => type.value === form.customer_type)?.title ?? "Quiero cotizar";
+  const lines = [
+    "Hola, quiero cotizar Lux Facturas.",
+    `Plan: ${selectedPlan}`,
+    `Tipo: ${selectedType}`,
+    form.customer_name ? `Nombre: ${form.customer_name}` : "",
+    form.company_name ? `Empresa: ${form.company_name}` : "",
+    form.document_number ? `RUC/DNI: ${form.document_number}` : "",
+    form.business_category ? `Rubro: ${form.business_category}` : "",
+    form.approx_product_quantity ? `Productos aprox.: ${form.approx_product_quantity}` : "",
+    form.city ? `Ciudad: ${form.city}` : "",
+    form.message ? `Mensaje: ${form.message}` : "",
+  ].filter(Boolean);
+
+  return `https://wa.me/${companyWhatsApp}?text=${encodeURIComponent(lines.join("\n"))}`;
+}
 
 function Logo() {
   return (
@@ -239,6 +334,287 @@ function ProductMockup() {
   );
 }
 
+function PurchaseOnboarding() {
+  const [form, setForm] = useState<LeadForm>(initialLeadForm);
+  const [submitState, setSubmitState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const selectedPlan = plans.find((plan) => plan.value === form.selected_plan) ?? plans[1];
+  const selectedType = customerTypes.find((type) => type.value === form.customer_type) ?? customerTypes[0];
+  const SelectedTypeIcon = selectedType.icon;
+  const whatsappLink = getWhatsAppLink(form);
+
+  function updateField<K extends keyof LeadForm>(field: K, value: LeadForm[K]) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function submitLead(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitState("loading");
+    setErrorMessage("");
+
+    const payload = {
+      ...form,
+      approx_product_quantity: Number.parseInt(form.approx_product_quantity, 10) || 0,
+    };
+
+    try {
+      const response = await fetch(getLeadEndpoint(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error ?? "No pudimos registrar la solicitud.");
+      }
+
+      setSubmitState("success");
+    } catch (error) {
+      setSubmitState("error");
+      setErrorMessage(error instanceof Error ? error.message : "No pudimos registrar la solicitud.");
+    }
+  }
+
+  return (
+    <section id="diagnostico" className="bg-night px-5 py-16 text-white sm:py-20 lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          variants={fadeUp}
+          transition={{ duration: 0.45 }}
+          className="lg:sticky lg:top-28"
+        >
+          <p className="border-y border-white/12 py-3 text-sm font-semibold leading-6 text-white/70">
+            Diagnostico de compra
+          </p>
+          <h2 className="mt-6 text-3xl font-semibold leading-tight sm:text-4xl">
+            Dinos como vendes y te recomendamos el kit correcto
+          </h2>
+          <p className="mt-4 max-w-xl text-lg leading-8 text-white/70">
+            Estas respuestas alimentan el panel de leads: plan elegido, tipo de cliente, rubro, cantidad de productos y datos de contacto para cotizar sin perder contexto.
+          </p>
+
+          <div className="mt-8 rounded-lg border border-white/10 bg-white/[0.045] p-5">
+            <div className="flex items-start gap-4">
+              <SelectedTypeIcon className="mt-1 text-cyan" size={26} />
+              <div>
+                <p className="text-sm font-semibold text-white/60">Lectura comercial</p>
+                <h3 className="mt-1 text-xl font-semibold">{selectedPlan.name}</h3>
+                <p className="mt-2 leading-7 text-white/70">
+                  {selectedType.title}. {selectedPlan.description}
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.form
+          onSubmit={submitLead}
+          className="rounded-lg border border-white/10 bg-white/[0.055] p-5 shadow-glow sm:p-6"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={fadeUp}
+          transition={{ duration: 0.45, delay: 0.06 }}
+        >
+          <div className="grid gap-6">
+            <div>
+              <h3 className="text-xl font-semibold">1. Que necesitas comprar?</h3>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {customerTypes.map((type) => {
+                  const Icon = type.icon;
+                  const active = form.customer_type === type.value;
+
+                  return (
+                    <button
+                      key={type.value}
+                      type="button"
+                      className={`pressable focus-ring rounded-lg border p-4 text-left transition ${
+                        active
+                          ? "border-cyan bg-cyan/12 text-white"
+                          : "border-white/12 bg-night/55 text-white/70 hover:border-white/30"
+                      }`}
+                      onClick={() => updateField("customer_type", type.value)}
+                    >
+                      <Icon size={23} className={active ? "text-cyan" : "text-white/45"} />
+                      <span className="mt-4 block font-semibold">{type.title}</span>
+                      <span className="mt-2 block text-sm leading-6 text-white/60">{type.text}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold">2. Elige el paquete base</h3>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {plans.map((plan) => {
+                  const active = form.selected_plan === plan.value;
+
+                  return (
+                    <button
+                      key={plan.value}
+                      type="button"
+                      className={`pressable focus-ring rounded-lg border p-4 text-left transition ${
+                        active
+                          ? "border-cyan bg-cyan/12 text-white"
+                          : "border-white/12 bg-night/55 text-white/70 hover:border-white/30"
+                      }`}
+                      onClick={() => updateField("selected_plan", plan.value)}
+                    >
+                      <span className="block font-semibold">{plan.name}</span>
+                      <span className="mt-2 block text-2xl font-semibold text-cyan">{plan.price}</span>
+                      <span className="mt-1 block text-sm text-white/55">{plan.monthly}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold">3. Datos del negocio</h3>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-white/70">Nombre del cliente</span>
+                  <input
+                    required
+                    value={form.customer_name}
+                    onChange={(event) => updateField("customer_name", event.target.value)}
+                    className="focus-ring rounded-lg border border-white/12 bg-night px-4 py-3 text-white outline-none placeholder:text-white/35"
+                    placeholder="Nombre y apellido"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-white/70">Empresa o razon social</span>
+                  <input
+                    value={form.company_name}
+                    onChange={(event) => updateField("company_name", event.target.value)}
+                    className="focus-ring rounded-lg border border-white/12 bg-night px-4 py-3 text-white outline-none placeholder:text-white/35"
+                    placeholder="Nombre comercial"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-white/70">RUC o DNI</span>
+                  <input
+                    required
+                    value={form.document_number}
+                    onChange={(event) => updateField("document_number", event.target.value)}
+                    className="focus-ring rounded-lg border border-white/12 bg-night px-4 py-3 text-white outline-none placeholder:text-white/35"
+                    placeholder="20614956683"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-white/70">Ciudad</span>
+                  <input
+                    value={form.city}
+                    onChange={(event) => updateField("city", event.target.value)}
+                    className="focus-ring rounded-lg border border-white/12 bg-night px-4 py-3 text-white outline-none placeholder:text-white/35"
+                    placeholder="Lima, Arequipa, Trujillo..."
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-white/70">Telefono / WhatsApp</span>
+                  <input
+                    required
+                    value={form.phone}
+                    onChange={(event) => updateField("phone", event.target.value)}
+                    className="focus-ring rounded-lg border border-white/12 bg-night px-4 py-3 text-white outline-none placeholder:text-white/35"
+                    placeholder="999 999 999"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-white/70">Email</span>
+                  <input
+                    required
+                    type="email"
+                    value={form.email}
+                    onChange={(event) => updateField("email", event.target.value)}
+                    className="focus-ring rounded-lg border border-white/12 bg-night px-4 py-3 text-white outline-none placeholder:text-white/35"
+                    placeholder="correo@empresa.com"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-white/70">Rubro</span>
+                  <select
+                    value={form.business_category}
+                    onChange={(event) => updateField("business_category", event.target.value)}
+                    className="focus-ring rounded-lg border border-white/12 bg-night px-4 py-3 text-white outline-none"
+                  >
+                    {businessCategories.map((category) => (
+                      <option key={category}>{category}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-white/70">Productos aproximados</span>
+                  <input
+                    min="0"
+                    type="number"
+                    value={form.approx_product_quantity}
+                    onChange={(event) => updateField("approx_product_quantity", event.target.value)}
+                    className="focus-ring rounded-lg border border-white/12 bg-night px-4 py-3 text-white outline-none placeholder:text-white/35"
+                    placeholder="300"
+                  />
+                </label>
+                <label className="grid gap-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-white/70">Mensaje adicional</span>
+                  <textarea
+                    value={form.message}
+                    onChange={(event) => updateField("message", event.target.value)}
+                    className="focus-ring min-h-28 rounded-lg border border-white/12 bg-night px-4 py-3 text-white outline-none placeholder:text-white/35"
+                    placeholder="Ejemplo: tengo una tienda con dos cajas, necesito ticketera y carga de productos."
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {submitState === "success" ? (
+            <p className="mt-5 rounded-lg border border-mint/25 bg-mint/10 px-4 py-3 text-sm font-semibold text-mint">
+              Solicitud registrada. Tambien puedes abrir WhatsApp con el resumen para acelerar la respuesta.
+            </p>
+          ) : null}
+
+          {submitState === "error" ? (
+            <p className="mt-5 rounded-lg border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-200">
+              {errorMessage} Puedes enviar el resumen por WhatsApp mientras revisamos la conexion.
+            </p>
+          ) : null}
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="submit"
+              disabled={submitState === "loading"}
+              className="pressable focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-cyan px-5 py-3 font-bold text-night disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Send size={18} />
+              {submitState === "loading" ? "Registrando..." : "Registrar solicitud"}
+            </button>
+            <a
+              href={whatsappLink}
+              target="_blank"
+              rel="noreferrer"
+              className="pressable focus-ring inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 px-5 py-3 font-bold text-white hover:border-cyan/60"
+            >
+              <MessageCircle size={18} />
+              Enviar por WhatsApp
+            </a>
+          </div>
+        </motion.form>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState(0);
@@ -261,14 +637,16 @@ export default function Home() {
 
           <div className="hidden items-center gap-3 md:flex">
             <a
-              href="#contacto"
+              href={`https://wa.me/${companyWhatsApp}`}
+              target="_blank"
+              rel="noreferrer"
               className="pressable focus-ring inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-bold text-white hover:border-cyan/60"
             >
               <MessageCircle size={17} />
               WhatsApp
             </a>
             <a
-              href="#contacto"
+              href="#diagnostico"
               className="pressable focus-ring inline-flex items-center gap-2 rounded-lg bg-cyan px-4 py-2 text-sm font-bold text-night hover:bg-cyan/90"
             >
               Cotizar kit
@@ -320,7 +698,7 @@ export default function Home() {
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <a
-                href="#contacto"
+                href="#diagnostico"
                 className="pressable focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-cyan px-5 py-3 text-base font-bold text-night shadow-glow hover:bg-cyan/90"
               >
                 Cotizar mi kit
@@ -528,6 +906,8 @@ export default function Home() {
         </div>
       </section>
 
+      <PurchaseOnboarding />
+
       <section id="planes" className="px-5 py-16 sm:py-20 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <SectionIntro
@@ -572,7 +952,7 @@ export default function Home() {
                 </ul>
 
                 <a
-                  href="#contacto"
+                  href="#diagnostico"
                   className={`pressable focus-ring mt-7 inline-flex w-full items-center justify-center gap-2 rounded-lg px-5 py-3 font-bold ${
                     plan.highlighted ? "bg-cyan text-night hover:bg-cyan/90" : "bg-ink text-white hover:bg-slate-800"
                   }`}
@@ -658,7 +1038,9 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <a
-              href="https://wa.me/51999999999"
+              href={`https://wa.me/${companyWhatsApp}`}
+              target="_blank"
+              rel="noreferrer"
               className="pressable focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-cyan px-5 py-3 font-bold text-night"
             >
               <MessageCircle size={19} />

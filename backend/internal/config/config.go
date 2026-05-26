@@ -7,6 +7,7 @@ type Config struct {
 	Port        string
 	DatabaseURL string
 	CORSOrigin  string
+	LeadsFile   string
 }
 
 func Load() Config {
@@ -15,6 +16,7 @@ func Load() Config {
 		Port:        getEnv("PORT", "8080"),
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		CORSOrigin:  getEnv("CORS_ORIGIN", "http://localhost:3000"),
+		LeadsFile:   getEnv("LEADS_FILE", "data/leads.json"),
 	}
 }
 
