@@ -1,0 +1,97 @@
+openapi: 3.0.3
+info:
+  title: Lux Facturas API
+  version: 0.1.0
+  description: API inicial para Lux Facturas, orientada a pymes y mypes del Peru.
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local
+tags:
+  - name: Health
+    description: Endpoints de estado del servicio
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Verifica si la API esta activa
+      operationId: getHealth
+      responses:
+        "200":
+          description: La API esta activa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+  /api/v1/status:
+    get:
+      tags:
+        - Health
+      summary: Obtiene el estado detallado del servicio
+      operationId: getStatus
+      responses:
+        "200":
+          description: Estado actual del servicio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+              example:
+                service: lux-facturas-api
+                status: ready
+                time: "2026-05-24T20:00:59Z"
+  /openapi.yaml:
+    get:
+      tags:
+        - Health
+      summary: Descarga la especificacion OpenAPI
+      operationId: getOpenAPISpec
+      responses:
+        "200":
+          description: Documento OpenAPI en YAML
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /swagger:
+    get:
+      tags:
+        - Health
+      summary: Abre Swagger UI
+      operationId: getSwaggerUI
+      responses:
+        "200":
+          description: Interfaz Swagger UI
+          content:
+            text/html:
+              schema:
+                type: string
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: ok
+    StatusResponse:
+      type: object
+      required:
+        - service
+        - status
+        - time
+      properties:
+        service:
+          type: string
+          example: lux-facturas-api
+        status:
+          type: string
+          example: ready
+        time:
+          type: string
+          format: date-time
+          example: "2026-05-24T20:00:59Z"

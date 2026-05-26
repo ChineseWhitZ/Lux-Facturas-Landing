@@ -1,0 +1,17 @@
+.env
+backend/.env
+.env.local
+.DS_Store
+.agents/
+skills-lock.json
+
+node_modules/
+.next/
+out/
+
+bin/
+dist/
+tmp/
+
+*.log
+*.test
