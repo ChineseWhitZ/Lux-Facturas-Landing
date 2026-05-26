@@ -1,11 +1,13 @@
 {
   "experimentalServices": {
     "frontend": {
+      "entrypoint": ".",
       "routePrefix": "/",
       "framework": "nextjs"
     },
     "backend": {
-      "root": "backend",
+      "entrypoint": "backend/cmd/api/main.go",
+      "framework": "go",
       "routePrefix": "/_/backend"
     }
   }
