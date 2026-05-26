@@ -21,6 +21,9 @@ Variables disponibles:
 - `DATABASE_URL`: cadena de conexion de PostgreSQL para futuras integraciones.
 - `CORS_ORIGIN`: origen permitido para el frontend. Por defecto `http://localhost:3000`.
 - `LEADS_FILE`: archivo JSON donde se guardan los leads. Por defecto `data/leads.json`.
+- `ADMIN_USER`: usuario para entrar al dashboard. Por defecto `admin`.
+- `ADMIN_PASSWORD`: clave para entrar al dashboard. En produccion debe cambiarse.
+- `SESSION_KEY`: secreto para firmar la cookie de sesion. En produccion debe ser largo y privado.
 
 ## Ejecutar
 
@@ -36,6 +39,21 @@ El backend tambien sirve una pantalla interna para revisar leads:
 http://localhost:8080/dashboard
 ```
 
+Primero debes iniciar sesion en:
+
+```txt
+http://localhost:8080/login
+```
+
+En desarrollo, si no defines variables, las credenciales son:
+
+```txt
+usuario: admin
+clave: lux-admin
+```
+
+En produccion configura `ADMIN_USER`, `ADMIN_PASSWORD` y `SESSION_KEY` en Vercel antes de publicar el backend.
+
 La raiz redirige automaticamente al dashboard:
 
 ```txt
@@ -46,6 +64,9 @@ http://localhost:8080
 
 ```txt
 GET /
+GET /login
+POST /login
+POST /logout
 GET /dashboard
 POST /dashboard/leads/{id}/status
 GET /health

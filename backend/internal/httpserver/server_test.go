@@ -114,8 +114,10 @@ func TestSwaggerEndpoints(t *testing.T) {
 }
 
 func TestDashboardEndpoint(t *testing.T) {
-	handler := newTestServer().Routes()
+	server := newTestServer()
+	handler := server.Routes()
 	request := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
+	addAdminCookie(request, server)
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
@@ -130,6 +132,42 @@ func TestDashboardEndpoint(t *testing.T) {
 
 	if !strings.Contains(response.Body.String(), "Dashboard interno de leads y compras") {
 		t.Fatal("expected dashboard page content")
+	}
+}
+
+func TestDashboardRequiresLogin(t *testing.T) {
+	handler := newTestServer().Routes()
+	request := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("expected status %d, got %d", http.StatusSeeOther, response.Code)
+	}
+
+	if location := response.Header().Get("Location"); location != "/login" {
+		t.Fatalf("expected redirect to /login, got %q", location)
+	}
+}
+
+func TestLoginLifecycle(t *testing.T) {
+	handler := newTestServer().Routes()
+	body := strings.NewReader("user=admin&password=lux-admin")
+	request := httptest.NewRequest(http.MethodPost, "/login", body)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("expected status %d, got %d", http.StatusSeeOther, response.Code)
+	}
+	if location := response.Header().Get("Location"); location != "/dashboard" {
+		t.Fatalf("expected redirect to /dashboard, got %q", location)
+	}
+	if cookies := response.Result().Cookies(); len(cookies) == 0 {
+		t.Fatal("expected session cookie")
 	}
 }
 
@@ -187,6 +225,7 @@ func TestDashboardStatusUpdate(t *testing.T) {
 	handler := server.Routes()
 	request := httptest.NewRequest(http.MethodPost, "/dashboard/leads/"+created.ID+"/status", strings.NewReader("status=cotizado"))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	addAdminCookie(request, server)
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
@@ -205,7 +244,8 @@ func TestDashboardStatusUpdate(t *testing.T) {
 }
 
 func TestLeadLifecycle(t *testing.T) {
-	handler := newTestServer().Routes()
+	server := newTestServer()
+	handler := server.Routes()
 	body := strings.NewReader(`{
 		"customer_name": "Maria Lopez",
 		"company_name": "Bodega San Jose",
@@ -241,6 +281,7 @@ func TestLeadLifecycle(t *testing.T) {
 	}
 
 	listRequest := httptest.NewRequest(http.MethodGet, "/api/v1/leads", nil)
+	addAdminCookie(listRequest, server)
 	listResponse := httptest.NewRecorder()
 
 	handler.ServeHTTP(listResponse, listRequest)
@@ -254,6 +295,7 @@ func TestLeadLifecycle(t *testing.T) {
 
 	updateBody := bytes.NewBufferString(`{"status":"contactado"}`)
 	updateRequest := httptest.NewRequest(http.MethodPatch, "/api/v1/leads/"+created.ID+"/status", updateBody)
+	addAdminCookie(updateRequest, server)
 	updateResponse := httptest.NewRecorder()
 
 	handler.ServeHTTP(updateResponse, updateRequest)
@@ -294,5 +336,15 @@ func newTestServer() *Server {
 		Environment: "test",
 		Port:        "8080",
 		CORSOrigin:  "http://localhost:3000",
+		AdminUser:   "admin",
+		AdminPass:   "lux-admin",
+		SessionKey:  "test-session-key",
 	}, logger, repository)
+}
+
+func addAdminCookie(request *http.Request, server *Server) {
+	request.AddCookie(&http.Cookie{
+		Name:  adminSessionCookie,
+		Value: server.signedSessionValue(server.config.AdminUser),
+	})
 }

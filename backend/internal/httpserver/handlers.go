@@ -1,7 +1,11 @@
 package httpserver
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"html/template"
@@ -21,6 +25,10 @@ var dashboardTemplate = template.Must(template.New("dashboard").Funcs(template.F
 	"statusLabel":       statusLabel,
 	"whatsappHref":      whatsappHref,
 }).Parse(dashboardHTML))
+
+var loginTemplate = template.Must(template.New("login").Parse(loginHTML))
+
+const adminSessionCookie = "lux_admin_session"
 
 type dashboardView struct {
 	Leads         []leads.Lead
@@ -91,7 +99,58 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dashboard", http.StatusFound)
 }
 
+func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	if s.isAuthenticated(r) {
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		return
+	}
+
+	s.renderLogin(w, "")
+}
+
+func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.renderLogin(w, "No pudimos leer el formulario.")
+		return
+	}
+
+	user := r.FormValue("user")
+	password := r.FormValue("password")
+	if !s.validAdminCredentials(user, password) {
+		s.renderLogin(w, "Usuario o clave incorrectos.")
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     adminSessionCookie,
+		Value:    s.signedSessionValue(user),
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
+		MaxAge:   int((12 * time.Hour).Seconds()),
+	})
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+}
+
+func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     adminSessionCookie,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
+		MaxAge:   -1,
+	})
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
 func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+
 	items := s.leadRepository.List()
 	view := dashboardView{
 		Leads: items,
@@ -129,6 +188,10 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) updateLeadStatusFromDashboard(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return
@@ -141,6 +204,46 @@ func (s *Server) updateLeadStatusFromDashboard(w http.ResponseWriter, r *http.Re
 	}
 
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+}
+
+func (s *Server) renderLogin(w http.ResponseWriter, message string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
+	if err := loginTemplate.Execute(w, map[string]string{"Message": message}); err != nil {
+		s.logger.Error("could not render login", "error", err)
+	}
+}
+
+func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
+	if s.isAuthenticated(r) {
+		return true
+	}
+
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	return false
+}
+
+func (s *Server) isAuthenticated(r *http.Request) bool {
+	cookie, err := r.Cookie(adminSessionCookie)
+	if err != nil {
+		return false
+	}
+
+	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(s.signedSessionValue(s.config.AdminUser))) == 1
+}
+
+func (s *Server) validAdminCredentials(user string, password string) bool {
+	userOK := subtle.ConstantTimeCompare([]byte(user), []byte(s.config.AdminUser)) == 1
+	passOK := subtle.ConstantTimeCompare([]byte(password), []byte(s.config.AdminPass)) == 1
+	return userOK && passOK
+}
+
+func (s *Server) signedSessionValue(user string) string {
+	mac := hmac.New(sha256.New, []byte(s.config.SessionKey))
+	mac.Write([]byte(user))
+	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return user + "." + signature
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
@@ -174,12 +277,20 @@ func (s *Server) createLead(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listLeads(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": s.leadRepository.List(),
 	})
 }
 
 func (s *Server) getLead(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+
 	lead, err := s.leadRepository.FindByID(r.PathValue("id"))
 	if errors.Is(err, leads.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "lead not found")
@@ -194,6 +305,10 @@ func (s *Server) getLead(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) updateLeadStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+
 	var input leads.UpdateStatusInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -257,6 +372,168 @@ const swaggerHTML = `<!doctype html>
         dom_id: "#swagger-ui"
       });
     </script>
+  </body>
+</html>`
+
+const loginHTML = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lux Facturas - Admin</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #070910;
+        --surface: #10131d;
+        --text: #f4f7fb;
+        --muted: #9aa4b6;
+        --border: rgba(255, 255, 255, .12);
+        --cyan: #19c7f3;
+        --red: #ff6b57;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        align-items: center;
+        background:
+          linear-gradient(140deg, rgba(25, 199, 243, .12), transparent 34%),
+          radial-gradient(circle at 82% 18%, rgba(61, 220, 132, .10), transparent 26%),
+          var(--bg);
+        color: var(--text);
+        display: grid;
+        font-family: "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .shell {
+        margin: 0 auto;
+        max-width: 430px;
+        width: 100%;
+      }
+
+      .brand {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+
+      .mark {
+        background: var(--cyan);
+        border-radius: 8px;
+        color: #071018;
+        display: grid;
+        font-weight: 900;
+        height: 42px;
+        place-items: center;
+        width: 42px;
+      }
+
+      h1 {
+        font-size: 22px;
+        line-height: 1.2;
+        margin: 0;
+      }
+
+      p {
+        color: var(--muted);
+        line-height: 1.7;
+        margin: 8px 0 0;
+      }
+
+      form {
+        background: rgba(16, 19, 29, .9);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        display: grid;
+        gap: 16px;
+        padding: 22px;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+      }
+
+      span {
+        color: rgba(244, 247, 251, .76);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      input,
+      button {
+        border-radius: 8px;
+        font: inherit;
+        min-height: 44px;
+        padding: 10px 12px;
+        width: 100%;
+      }
+
+      input {
+        background: #070910;
+        border: 1px solid var(--border);
+        color: var(--text);
+        outline: none;
+      }
+
+      input:focus {
+        border-color: rgba(25, 199, 243, .72);
+      }
+
+      button {
+        background: var(--cyan);
+        border: 1px solid var(--cyan);
+        color: #071018;
+        cursor: pointer;
+        font-weight: 900;
+        transition: transform 160ms ease-out;
+      }
+
+      button:active {
+        transform: scale(.97);
+      }
+
+      .error {
+        background: rgba(255, 107, 87, .12);
+        border: 1px solid rgba(255, 107, 87, .26);
+        border-radius: 8px;
+        color: #ffd0ca;
+        font-size: 14px;
+        font-weight: 800;
+        padding: 11px 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <div class="brand">
+        <span class="mark">L</span>
+        <div>
+          <h1>Lux Facturas Admin</h1>
+          <p>Ingresa para revisar leads, compras y seguimiento comercial.</p>
+        </div>
+      </div>
+
+      <form method="post" action="/login">
+        {{if .Message}}<div class="error">{{.Message}}</div>{{end}}
+        <label>
+          <span>Usuario</span>
+          <input name="user" autocomplete="username" required>
+        </label>
+        <label>
+          <span>Clave</span>
+          <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Entrar al dashboard</button>
+      </form>
+    </main>
   </body>
 </html>`
 
@@ -364,7 +641,8 @@ const dashboardHTML = `<!doctype html>
         gap: 10px;
       }
 
-      .nav a {
+      .nav a,
+      .nav button {
         border: 1px solid var(--border);
         border-radius: 8px;
         color: var(--text);
@@ -375,12 +653,23 @@ const dashboardHTML = `<!doctype html>
         transition: border-color 160ms ease-out, transform 160ms ease-out;
       }
 
+      .nav form {
+        display: inline-flex;
+      }
+
+      .nav button {
+        background: transparent;
+        cursor: pointer;
+        font-family: inherit;
+      }
+
       .nav a:active,
       button:active {
         transform: scale(.97);
       }
 
-      .nav a:hover {
+      .nav a:hover,
+      .nav button:hover {
         border-color: rgba(25, 199, 243, .55);
       }
 
@@ -708,6 +997,9 @@ const dashboardHTML = `<!doctype html>
           <a href="/swagger">Swagger</a>
           <a href="/openapi.yaml">OpenAPI</a>
           <a href="/api/v1/leads">JSON</a>
+          <form method="post" action="/logout">
+            <button type="submit">Salir</button>
+          </form>
         </nav>
       </div>
     </header>

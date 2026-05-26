@@ -26,6 +26,9 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", s.home)
+	mux.HandleFunc("GET /login", s.login)
+	mux.HandleFunc("POST /login", s.loginSubmit)
+	mux.HandleFunc("POST /logout", s.logout)
 	mux.HandleFunc("GET /dashboard", s.dashboard)
 	mux.HandleFunc("POST /dashboard/leads/{id}/status", s.updateLeadStatusFromDashboard)
 	mux.HandleFunc("GET /health", s.health)

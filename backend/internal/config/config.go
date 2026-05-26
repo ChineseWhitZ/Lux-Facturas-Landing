@@ -8,6 +8,9 @@ type Config struct {
 	DatabaseURL string
 	CORSOrigin  string
 	LeadsFile   string
+	AdminUser   string
+	AdminPass   string
+	SessionKey  string
 }
 
 func Load() Config {
@@ -17,6 +20,9 @@ func Load() Config {
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		CORSOrigin:  getEnv("CORS_ORIGIN", "http://localhost:3000"),
 		LeadsFile:   getEnv("LEADS_FILE", "data/leads.json"),
+		AdminUser:   getEnv("ADMIN_USER", "admin"),
+		AdminPass:   getEnv("ADMIN_PASSWORD", "lux-admin"),
+		SessionKey:  getEnv("SESSION_KEY", "dev-session-key-change-me"),
 	}
 }
 
